@@ -33,8 +33,8 @@ trait.df
 ###Import phylogentic information (nexus file) from  github directory
 ##I produced this phylogeny using the http://birdtree.org 
 ##Now read in your tree (here we’re using the read.nexus function from the APE package)
-##this is an  output.nex from http://birdtree.org
-#ps: i am using the notation for Mac to choose the file in the computer, but you can read the nexus as you wish
+##This is an  output.nex from http://birdtree.org
+
 
 tree=read.nexus("https://raw.githubusercontent.com/bastazini/geekcologist/main/output.nex")
 
