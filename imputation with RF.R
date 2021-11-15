@@ -30,13 +30,11 @@ while(sum(is.na(trait.df) == TRUE) < (miss.val)){
 trait.df
 
 
-###Import phylogentic information (nexus file) from  github directory
-##I produced this phylogeny using the http://birdtree.org 
-##Now read in your tree (here we’re using the read.nexus function from the APE package)
-##This is an  output.nex from http://birdtree.org
+###Import phylogentic information (nexus file)  with 100 phylogenies from  GitHub directory
+#Tree distribution from: "The global diversity of birds in space and time; W. Jetz, G. H. Thomas, J. B. Joy, K. Hartmann, A. O. Mooers, doi:10.1038/nature11631]
+#Subsampled and pruned from birdtree.org on 2021-11-03
 
-
-tree=read.nexus("https://raw.githubusercontent.com/bastazini/geekcologist/main/output.nex")
+tree=read.nexus("https://raw.githubusercontent.com/bastazini/geekcologist/main/birds_phylo.nex")
 
 ##Create a consensus tree. 
 #Note: p=0.5 specifies that the tree must be "majority rules consensus (MRC)"
