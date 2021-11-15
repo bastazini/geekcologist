@@ -1,5 +1,5 @@
 # Darwin to the Rescue: Using Phylogenetic information to overcome the Raunkiaeran shortfall
-#teste
+
 ###Load packages
 require(geiger)
 require(PVR)
