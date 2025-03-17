@@ -1,0 +1,110 @@
+#Foodwebs used in the promotional figure of Transport Ecology
+# Install necessary packages (if not already installed)
+# install.packages(c("igraph", "ggplot2", "gridExtra"))
+
+library(igraph)
+library(ggplot2)
+library(gridExtra)
+library(ggraph)
+
+# Function to create a bipartite food web
+create_food_web <- function(n_prey, n_predators, connectance) {
+  # connectance is the proportion of all possible links that are present
+  possible_edges <- n_prey * n_predators
+  n_edges <- round(connectance * possible_edges)
+  
+  # Create random edges
+  edges <- sample(1:(n_prey * n_predators), n_edges, replace = FALSE)
+  
+  # Convert edge indices to predator-prey pairs
+  predator_indices <- ((edges - 1) %/% n_prey) + 1
+  prey_indices <- ((edges - 1) %% n_prey) + 1
+  
+  # Create igraph object
+  graph <- graph_from_edgelist(cbind(paste0("P", predator_indices), paste0("V", prey_indices)), directed = FALSE)
+  
+  # Assign node types (bipartite = TRUE)
+  V(graph)$type <- grepl("^V", V(graph)$name)
+  
+  return(graph)
+}
+
+# Function to create a simplified landscape representation as a ggplot
+create_landscape_plot <- function(road_density = 0, vertical_line = FALSE, horizontal_line = FALSE) {
+  green_color <- "forestgreen"
+  alpha_level <- 1 - road_density
+  fill_color <- adjustcolor(green_color, alpha.f = alpha_level)
+  
+  #Calculate grey value for the lines based on alpha
+  grey_value <- 1 - alpha_level
+  line_color <- gray(grey_value)
+  
+  
+  landscape_plot <- ggplot() +
+    geom_rect(aes(xmin = 0, xmax = 1, ymin = 0, ymax = 1), fill = fill_color) +
+    geom_jitter(aes(x = runif(100), y = runif(100)), color = "gray50", size = 0.5, alpha = 0.1) + # VERY subtle texture
+    coord_fixed(xlim = c(0, 1), ylim = c(0, 1)) +
+    theme_void()
+  
+  # Add vertical line
+  if (vertical_line) {
+    landscape_plot <- landscape_plot +
+      geom_segment(aes(x = 0.5, xend = 0.5, y = 0, yend = 1), color = line_color, linewidth = 3)  # Explicitly set line color, thicker grey line
+    
+    # Add dashed yellow line inside the grey line
+    landscape_plot <- landscape_plot +
+      geom_segment(aes(x = 0.5, xend = 0.5, y = 0, yend = 1), color = "yellow", linewidth = 0.5, linetype = "dashed") # Dashed yellow line, thinner
+  }
+  
+  # Add horizontal line
+  if (horizontal_line) {
+    landscape_plot <- landscape_plot +
+      geom_segment(aes(x = 0, xend = 1, y = 0.5, yend = 0.5), color = line_color, linewidth = 3)  # Explicitly set line color, thicker grey line
+    
+    # Add dashed yellow line inside the grey line
+    landscape_plot <- landscape_plot +
+      geom_segment(aes(x = 0, xend = 1, y = 0.5, yend = 0.5), color = "yellow", linewidth = 0.5, linetype = "dashed") # Dashed yellow line, thinner
+  }
+  
+  return(landscape_plot)
+}
+
+# Function to plot the landscape and food web side-by-side
+plot_panel <- function(landscape_plot, food_web, title) {
+  foodweb_plot <- ggraph(food_web, layout = "igraph", algorithm = "bipartite") +
+    geom_edge_link(edge_color = "gray70", edge_alpha = 0.3) + # Increased transparency
+    geom_node_point(aes(color = V(food_web)$type, shape = V(food_web)$type), size = 8, stroke = 0.75) +  # Larger and with stroke
+    scale_color_manual(values = c("TRUE" = "springgreen3", "FALSE" = "firebrick3"), labels = c("Prey", "Predator")) +  # Brighter colors
+    scale_shape_manual(values = c("TRUE" = 17, "FALSE" = 16), labels = c("Prey", "Predator")) + # Prey = triangles, Predator = circles
+    theme_void() +
+    theme(legend.position = "none") + # Remove legend
+    theme(plot.margin = unit(c(1, 1, 1, 1), "cm"))  # Add margins to food web plot (top, right, bottom, left)
+  
+  combined_plot <- grid.arrange(landscape_plot, foodweb_plot, ncol = 2, widths = c(0.6, 0.4), top = title) #Removed labs(title) and added title to grid arrange
+  return(combined_plot)
+}
+
+# --- Define Parameters for Each Panel ---
+# Panel 1: Natural Landscape
+landscape_plot1 <- create_landscape_plot(road_density = 0)
+food_web1 <- create_food_web(n_prey = 10, n_predators = 7, connectance = 0.6) # Higher connectance
+title1 <- "Natural Landscape\nComplex Food Web"
+
+# Panel 2: Low Road Density
+landscape_plot2 <- create_landscape_plot(road_density = 0.3, vertical_line = TRUE)
+food_web2 <- create_food_web(n_prey = 8, n_predators = 5, connectance = 0.4) # Reduced connectance
+title2 <- "Low Road Density\nSimplified Food Web"
+
+# Panel 3: High Road Density
+landscape_plot3 <- create_landscape_plot(road_density = 0.7, vertical_line = TRUE, horizontal_line = TRUE)
+food_web3 <- create_food_web(n_prey = 6, n_predators = 3, connectance = 0.2) # Even lower connectance
+title3 <- "High Road Density\nHighly Simplified Food Web"
+
+# --- Generate the Plots ---
+plot1 <- plot_panel(landscape_plot1, food_web1, title1)
+plot2 <- plot_panel(landscape_plot2, food_web2, title2)
+plot3 <- plot_panel(landscape_plot3, food_web3, title3)
+
+# --- Arrange all three plots in a single figure ---
+final_plot <- grid.arrange(plot1, plot2, plot3, nrow = 3, heights = c(1, 1, 1))  #Equal heights for rows.
+
