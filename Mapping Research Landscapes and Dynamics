@@ -1,0 +1,578 @@
+rm(list = ls())
+
+####Packages
+cat("--- 1. Loading Libraries ---\n")
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(igraph)
+library(ggplot2)
+library(ggrepel)
+library(RColorBrewer) 
+library(wordcloud)  
+library(networkD3)
+library(htmlwidgets)
+
+### 2. Parameters
+cat("--- 2. Setting Parameters ---\n")
+
+# Simulation Parameters
+n_studies <- 300             # Number of simulated studies
+start_year <- 2000           # Start year for publications
+end_year <- 2025             # End year for publications
+keywords_per_study <- 5      # Number of keywords per study
+set.seed(42)                 # For reproducible simulation
+
+# Keyword Pool (related to coevolutionary dynamics)
+keyword_pool <- c(
+  "coevolution", "arms race", "mutualism", "antagonism", "host-parasite",
+  "plant-pollinator", "Red Queen hypothesis", "selection pressure", "adaptation",
+  "phylogeny", "gene flow", "speciation", "ecological interaction", "community ecology",
+  "predator-prey", "ecophylogenetics", "co-speciation", "evolutionary dynamics", "co-phylogenetic analysis",
+  "genotype interaction", "local adaptation", "trait evolution", "phylogenetic signal",
+  "functional traits", "ecological networks", "population genetics", "coevolutionary networks"
+)
+
+# Analysis Parameters
+keyword_column_sim <- "Author_Keywords" # Name for the keyword column in simulated data
+year_column_sim <- "Year"               # Name for the year column in simulated data
+min_cooccurrence <- 3                   # Min times two keywords must appear together
+min_keyword_freq_network <- 3           # Min total frequency for a keyword to be in the network plot
+max_words_cloud <- 75                   # Max words to display in the word cloud
+
+# Sankey Parameters
+num_top_keywords_yearly <- 10           # Number of top keywords for the YEARLY Sankey diagram
+num_top_keywords_per_decade <- 10       # Number of top keywords PER DECADE for the DECADE Sankey
+
+# --- 3. Simulate Bibliographic Data ---
+cat("--- 3. Simulating Study Data ---\n")
+
+simulated_studies <- tibble(
+  paper_id = 1:n_studies,
+  Year = sample(start_year:end_year, n_studies, replace = TRUE)
+)
+
+# Generate keywords for each study
+keywords_list <- lapply(1:n_studies, function(i) {
+  sample(keyword_pool, keywords_per_study, replace = FALSE)
+})
+
+# Combine into a long format data frame (one row per keyword per paper)
+keywords_long_sim <- simulated_studies %>%
+  mutate(keywords = keywords_list) %>%
+  unnest(keywords) %>%
+  rename(!!sym(keyword_column_sim) := keywords,
+         !!sym(year_column_sim) := Year) %>%
+  select(paper_id, !!sym(year_column_sim), !!sym(keyword_column_sim)) %>%
+  mutate(keyword = str_trim(tolower(!!sym(keyword_column_sim)))) %>%
+  select(paper_id, year = !!sym(year_column_sim), keyword) %>%
+  distinct(paper_id, year, keyword) # Ensure unique keyword per paper/year instance
+
+cat("Generated", n_studies, "studies (", start_year, "-", end_year, ") with",
+    nrow(keywords_long_sim), "unique keyword instances per paper/year.\n")
+cat("Example simulated data:\n")
+print(head(keywords_long_sim))
+
+# Use this simulated data for the rest of the analysis
+keywords_long <- keywords_long_sim
+
+# --- 4. Calculate Overall Keyword Frequencies ---
+cat("\n--- 4. Calculating Overall Keyword Frequencies ---\n")
+keyword_total_freq <- keywords_long %>%
+  # Count unique keywords per paper first, then sum across papers
+  distinct(paper_id, keyword) %>%
+  count(keyword, name = "total_freq", sort = TRUE)
+
+cat("Top overall keywords (based on number of papers):\n")
+print(head(keyword_total_freq))
+
+
+# --- 5. Word Cloud ---  <<< MOVED HERE & RENUMBERED >>>
+cat("\n--- 5. Generating Word Cloud ---\n")
+
+if (exists("keyword_total_freq") && nrow(keyword_total_freq) > 0) {
+  cat("   - Creating Word Cloud (Check RStudio Plots Pane)...\n")
+  tryCatch({
+    # Ensure Plots pane is active and clear previous plots if desired
+    # dev.new() # Optional: Open a new graphics device window
+    wordcloud(words = keyword_total_freq$keyword,
+              freq = keyword_total_freq$total_freq,
+              min.freq = 2, # Show words appearing in at least 2 papers
+              max.words = max_words_cloud,
+              random.order = FALSE, # Plot most frequent words first
+              rot.per = 0.30,      # Percentage of words rotated
+              colors = brewer.pal(8, "Dark2")) # Color palette
+    title(main = "Overall Keyword Frequency Word Cloud", line = -1) # Add a title near the top
+  }, error = function(e) {
+    cat("     > Error generating word cloud:", conditionMessage(e), "\n")
+  })
+  
+} else {
+  cat("   - Skipping word cloud (no keyword frequency data available).\n")
+}
+
+
+# --- 6. Keyword Co-occurrence Network Analysis --- <<< RENUMBERED >>>
+cat("\n--- 6. Building Keyword Co-occurrence Network ---\n")
+# (Uses keywords_long which contains year info, but pairs are per paper regardless of year)
+
+# 6a. Generate keyword pairs within each paper
+cat("   - Generating keyword pairs...\n")
+keyword_pairs_unnested <- keywords_long %>%
+  group_by(paper_id) %>%
+  filter(n() >= 2) %>%
+  summarise(pairs = list(combn(keyword, 2, simplify = FALSE)), .groups = 'drop') %>%
+  unnest(pairs) %>%
+  mutate(
+    keyword1 = sapply(pairs, `[`, 1),
+    keyword2 = sapply(pairs, `[`, 2)
+  ) %>%
+  select(keyword1, keyword2)
+
+# 6b. Standardize & Count Pairs
+cat("   - Counting co-occurrences (min =", min_cooccurrence, ")...\n")
+keyword_pair_counts <- keyword_pairs_unnested %>%
+  mutate(
+    temp_kw1 = pmin(keyword1, keyword2),
+    temp_kw2 = pmax(keyword1, keyword2)
+  ) %>%
+  select(keyword1 = temp_kw1, keyword2 = temp_kw2) %>%
+  count(keyword1, keyword2, name = "weight") %>%
+  filter(weight >= min_cooccurrence)
+
+# 6c. Create and Filter Graph
+graph_plot_obj <- NULL
+communities <- NULL
+
+if(nrow(keyword_pair_counts) > 0) {
+  cat("   - Creating graph object...\n")
+  graph_obj <- graph_from_data_frame(keyword_pair_counts, directed = FALSE)
+  
+  cat("   - Filtering graph (min degree =", min_keyword_freq_network, ") & detecting communities...\n")
+  node_degrees <- degree(graph_obj, mode = "all")
+  nodes_to_keep <- names(node_degrees[node_degrees >= min_keyword_freq_network])
+  
+  if(length(nodes_to_keep) > 0){
+    graph_filtered <- induced_subgraph(graph_obj, V(graph_obj)$name %in% nodes_to_keep)
+    graph_filtered <- delete.vertices(graph_filtered, degree(graph_filtered) == 0)
+    
+    if (vcount(graph_filtered) > 0 && ecount(graph_filtered) > 0) {
+      communities <- cluster_louvain(graph_filtered)
+      num_communities <- length(unique(membership(communities)))
+      cat("     > Detected", num_communities, "communities (Louvain).\n")
+      
+      node_data <- tibble(name = V(graph_filtered)$name) %>%
+        left_join(keyword_total_freq, by = c("name" = "keyword")) %>%
+        mutate(total_freq = ifelse(is.na(total_freq), 1, total_freq))
+      
+      V(graph_filtered)$size <- log1p(node_data$total_freq) * 2.5
+      V(graph_filtered)$label <- V(graph_filtered)$name
+      V(graph_filtered)$community <- membership(communities)
+      V(graph_filtered)$total_freq <- node_data$total_freq
+      
+      # Assign colors based on community
+      if (num_communities > 0) {
+        num_colors_needed = length(unique(V(graph_filtered)$community))
+        if (num_colors_needed > 8) {
+          community_colors <- colorRampPalette(brewer.pal(8, "Set2"))(num_colors_needed)
+        } else if (num_colors_needed > 2) {
+          community_colors <- brewer.pal(max(3, num_colors_needed), "Set2")[1:num_colors_needed]
+        } else if (num_colors_needed == 2) {
+          community_colors <- brewer.pal(3, "Set2")[1:2]
+        } else { # num_colors_needed == 1
+          community_colors <- brewer.pal(3, "Set2")[1]
+        }
+        community_map <- setNames(community_colors, sort(unique(V(graph_filtered)$community)))
+        V(graph_filtered)$color <- community_map[as.character(V(graph_filtered)$community)]
+      } else {
+        V(graph_filtered)$color <- "grey"
+        community_map <- NULL
+      }
+      
+      graph_plot_obj <- graph_filtered
+      cat("     > Filtered graph ready:", vcount(graph_plot_obj), "nodes,", ecount(graph_plot_obj), "edges.\n")
+      
+    } else {
+      cat("     > Warning: Graph empty after filtering.\n")
+      graph_plot_obj <- NULL
+      communities <- NULL
+    }
+  } else {
+    cat("     > Warning: No nodes met minimum degree requirement.\n")
+    graph_plot_obj <- NULL
+    communities <- NULL
+  }
+} else {
+  cat("   - Warning: No keyword pairs met the minimum co-occurrence threshold.\n")
+  graph_plot_obj <- NULL
+  communities <- NULL
+}
+
+# 6d. Visualize Network (Print to RStudio Plots Pane)
+if (!is.null(graph_plot_obj)) {
+  cat("   - Plotting Co-occurrence Network (Check RStudio Plots Pane)...\n")
+  tryCatch({
+    par(mar=c(1, 1, 3, 1))
+    plot(graph_plot_obj,
+         layout = layout_nicely(graph_plot_obj),
+         vertex.frame.color = "grey40", vertex.label.color = "black",
+         vertex.label.cex = 0.7, vertex.label.dist = 0.4,
+         edge.color = rgb(0.5, 0.5, 0.5, alpha = 0.4), edge.curved = 0.1,
+         edge.width = scales::rescale(E(graph_plot_obj)$weight, to = c(0.3, 3.0)),
+         main = "Keyword Co-occurrence Network (Simulated Data)",
+         sub = paste("Nodes sized by log(# Papers), Min Degree >=", min_keyword_freq_network)
+    )
+    if (!is.null(community_map) && length(community_map) <= 12 && length(community_map) > 1) {
+      legend("bottomleft", legend = paste("Cluster", names(community_map)),
+             fill = community_map, bty = "n", cex = 0.7, title="Communities")
+    }
+    par(mar=c(5.1, 4.1, 4.1, 2.1)) # Reset margins
+  }, error = function(e){
+    cat("     > Error plotting network:", conditionMessage(e), "\n")
+    par(mar=c(5.1, 4.1, 4.1, 2.1)) # Reset margins on error
+  })
+} else {
+  cat("   - Skipping network plot (no valid graph).\n")
+}
+
+
+# --- 7. Thematic Map Analysis --- <<< RENUMBERED >>>
+cat("\n--- 7. Generating Thematic Map (Callon's Metrics) ---\n")
+
+# Helper function (define before use)
+calculate_callon_metrics <- function(graph, communities_object, cluster_id) {
+  if (is.null(graph) || !is.igraph(graph) || is.null(communities_object)) {
+    return(list(centrality = 0, density = 0, n_keywords = 0))
+  }
+  cluster_nodes_indices <- which(membership(communities_object) == cluster_id)
+  if (length(cluster_nodes_indices) == 0) {
+    return(list(centrality = 0, density = 0, n_keywords = 0))
+  }
+  n_nodes_in_cluster <- length(cluster_nodes_indices)
+  subgraph <- induced_subgraph(graph, cluster_nodes_indices)
+  internal_weight_sum <- if (ecount(subgraph) > 0) sum(E(subgraph)$weight, na.rm = TRUE) else 0
+  density <- internal_weight_sum
+  external_weight_sum <- 0
+  all_incident_edges_indices <- E(graph)[.inc(cluster_nodes_indices)]
+  if (length(all_incident_edges_indices) > 0) {
+    all_incident_edges <- E(graph)[all_incident_edges_indices]
+    ends_matrix <- ends(graph, all_incident_edges, names = FALSE)
+    mem <- membership(communities_object)
+    is_external <- (mem[ends_matrix[,1]] != cluster_id) | (mem[ends_matrix[,2]] != cluster_id)
+    external_edges <- all_incident_edges[is_external]
+    if (length(external_edges) > 0) {
+      external_weight_sum <- sum(E(graph)$weight[external_edges], na.rm = TRUE)
+    }
+  }
+  centrality <- external_weight_sum
+  return(list(centrality = centrality, density = density, n_keywords = n_nodes_in_cluster))
+}
+
+
+thematic_plot_obj <- NULL
+
+if (!is.null(graph_plot_obj) && !is.null(communities) && length(unique(membership(communities))) > 0) {
+  cat("   - Calculating Centrality and Density for communities...\n")
+  
+  community_ids <- unique(membership(communities))
+  thematic_metrics <- lapply(community_ids, function(comm_id) {
+    metrics <- calculate_callon_metrics(graph_plot_obj, communities, comm_id)
+    nodes_in_comm_indices <- which(membership(communities) == comm_id)
+    community_node_names <- V(graph_plot_obj)$name[nodes_in_comm_indices]
+    community_node_freqs <- V(graph_plot_obj)$total_freq[nodes_in_comm_indices]
+    
+    if(length(community_node_names) > 0 && length(community_node_freqs) > 0 && !all(is.na(community_node_freqs))){
+      most_frequent_keyword <- community_node_names[which.max(community_node_freqs)]
+      community_label <- str_trunc(most_frequent_keyword, 30)
+    } else {
+      community_label <- paste("Cluster", comm_id)
+    }
+    
+    return(tibble(
+      community_id = comm_id, label = community_label,
+      Centrality = metrics$centrality, Density = metrics$density,
+      n_keywords = metrics$n_keywords
+    ))
+  })
+  
+  thematic_data <- bind_rows(thematic_metrics) %>%
+    mutate(Centrality = as.numeric(Centrality), Density = as.numeric(Density)) %>%
+    filter(!is.na(community_id), n_keywords > 0, is.finite(Centrality), is.finite(Density))
+  
+  if(nrow(thematic_data) > 0) {
+    cat("   - Creating Thematic Map plot object...\n")
+    median_centrality <- median(thematic_data$Centrality, na.rm = TRUE)
+    median_density <- median(thematic_data$Density, na.rm = TRUE)
+    median_centrality <- ifelse(is.finite(median_centrality), median_centrality, 0)
+    median_density <- ifelse(is.finite(median_density), median_density, 0)
+    cat("     > Quadrant thresholds (Medians): Centrality=", round(median_centrality,2), ", Density=", round(median_density,2), "\n")
+    
+    thematic_plot_obj <- ggplot(thematic_data, aes(x = Centrality, y = Density)) +
+      geom_hline(yintercept = median_density, linetype = "dashed", color = "grey50") +
+      geom_vline(xintercept = median_centrality, linetype = "dashed", color = "grey50") +
+      geom_point(aes(size = n_keywords), alpha = 0.7, color = "steelblue") +
+      geom_text_repel(aes(label = label), size = 3.0, max.overlaps = 15,
+                      box.padding = 0.4, point.padding = 0.6) +
+      scale_size_continuous(range = c(4, 12), name = "# Keywords\nin Theme") +
+      ggplot2::annotate("text", x = median_centrality, y = Inf, label = "Motor Themes", hjust = 0.5, vjust = 1.5, size = 3.5, color = "grey40", fontface="bold") +
+      ggplot2::annotate("text", x = -Inf, y = Inf, label = "Niche Themes", hjust = -0.1, vjust = 1.5, size = 3.5, color = "grey40", fontface="bold") +
+      ggplot2::annotate("text", x = -Inf, y = -Inf, label = "Emerging/\nDeclining", hjust = -0.1, vjust = -0.5, size = 3.5, color = "grey40", fontface="bold") +
+      ggplot2::annotate("text", x = median_centrality, y = -Inf, label = "Basic Themes", hjust = 0.5, vjust = -0.5, size = 3.5, color = "grey40", fontface="bold") +
+      labs(
+        title = "Thematic Map (Callon's Centrality & Density)",
+        subtitle = "Keyword Clusters from Co-occurrence Network (Simulated Data)",
+        x = "Centrality (Links to other themes)",
+        y = "Density (Internal theme links)"
+      ) +
+      theme_minimal(base_size = 12) +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.margin = margin(20, 20, 20, 20)
+      )
+    
+    # Visualize Thematic Map (Print to RStudio Plots Pane)
+    cat("   - Plotting Thematic Map (Check RStudio Plots Pane)...\n")
+    print(thematic_plot_obj)
+    
+  } else {
+    cat("   - Warning: No valid thematic data to plot.\n")
+  }
+} else {
+  cat("   - Skipping Thematic Map (network or communities missing).\n")
+}
+
+
+# --- 8. Yearly Keyword Trend Analysis (Sankey Diagram) --- <<< RENUMBERED >>>
+cat("\n--- 8. Generating Yearly Keyword Trend Sankey Diagram ---\n")
+
+sankey_plot_obj_yearly <- NULL
+
+# 8a. Count Keywords per Year
+cat("   - Counting keyword frequency per year (using unique paper/keyword counts)...\n")
+keyword_yearly_counts <- keywords_long %>%
+  distinct(paper_id, year, keyword) %>% # Count keyword once per paper per year
+  count(year, keyword, name = "yearly_count") %>%
+  filter(yearly_count > 0)
+
+# 8b. Identify Top Keywords Overall (Using paper frequency calculated earlier)
+cat("   - Identifying top", num_top_keywords_yearly, "keywords overall for yearly Sankey...\n")
+if(exists("keyword_total_freq") && inherits(keyword_total_freq, "data.frame") && nrow(keyword_total_freq) > 0) {
+  top_keywords_df_yearly <- keyword_total_freq
+} else {
+  cat("     > Warning: 'keyword_total_freq' not found. Recalculating based on yearly counts (less accurate representation of 'overall').\n")
+  top_keywords_df_yearly <- keyword_yearly_counts %>% group_by(keyword) %>% summarise(total_freq = sum(yearly_count)) %>% arrange(desc(total_freq))
+}
+
+top_keywords_yearly <- top_keywords_df_yearly %>%
+  slice_head(n = num_top_keywords_yearly) %>%
+  pull(keyword)
+
+if(length(top_keywords_yearly) > 0){
+  cat("     > Top keywords for Yearly Sankey:", paste(top_keywords_yearly, collapse = ", "), "\n")
+  
+  # 8c. Prepare Data for Yearly Sankey
+  sankey_data_yearly <- keyword_yearly_counts %>%
+    filter(keyword %in% top_keywords_yearly)
+  
+  if(nrow(sankey_data_yearly) == 0) {
+    cat("   - Warning: No yearly counts found for the top keywords. Skipping Yearly Sankey.\n")
+  } else {
+    cat("   - Preparing data for Yearly Sankey diagram...\n")
+    year_nodes_chr_yr <- as.character(sort(unique(sankey_data_yearly$year)))
+    keyword_nodes_sankey_yr <- unique(sankey_data_yearly$keyword)
+    # Prefix years to distinguish from keywords if necessary
+    all_node_names_yr <- c(paste0("Y:", year_nodes_chr_yr), keyword_nodes_sankey_yr)
+    
+    nodes_df_yr <- data.frame(name = all_node_names_yr, stringsAsFactors = FALSE) %>%
+      mutate(id = row_number() - 1)
+    
+    links_df_yr <- sankey_data_yearly %>%
+      mutate(
+        source_name = paste0("Y:", as.character(year)),
+        target_name = keyword
+      ) %>%
+      left_join(nodes_df_yr %>% select(name, source_id = id), by = c("source_name" = "name")) %>%
+      left_join(nodes_df_yr %>% select(name, target_id = id), by = c("target_name" = "name")) %>%
+      filter(!is.na(source_id), !is.na(target_id)) %>%
+      transmute(
+        source = source_id, target = target_id,
+        value = yearly_count, group = target_name # Color links by target keyword
+      ) %>%
+      filter(value > 0)
+    
+    if(nrow(links_df_yr) == 0) {
+      cat("   - Warning: Failed to create valid links for Yearly Sankey diagram. Skipping.\n")
+    } else {
+      # 8d. Generate Yearly Sankey Diagram Object
+      cat("   - Creating Yearly Sankey plot object...\n")
+      sankey_plot_obj_yearly <- sankeyNetwork(
+        Links = links_df_yr, Nodes = nodes_df_yr, Source = "source",
+        Target = "target", Value = "value", NodeID = "name",
+        NodeGroup = NULL, LinkGroup = "group", units = "Papers",
+        fontSize = 11, nodeWidth = 30, nodePadding = 15, sinksRight = TRUE,
+        margin = list(top=5, bottom=5, left=5, right=5)
+      )
+      
+      # 8e. Visualize Yearly Sankey (Print to RStudio Viewer Pane)
+      if (!is.null(sankey_plot_obj_yearly)) {
+        cat("   - Plotting Yearly Sankey Diagram (Check RStudio Viewer Pane)...\n")
+        sankey_title_yr <- paste0("Flow of Top ", num_top_keywords_yearly, " Keywords Over Time (Yearly, Simulated)")
+        sankey_plot_obj_yr_title <- htmlwidgets::prependContent(sankey_plot_obj_yearly,
+                                                                htmltools::h3(sankey_title_yr, style = "text-align:center;"))
+        print(sankey_plot_obj_yr_title)
+      } else {
+        cat ("   - Warning: Yearly Sankey plot object could not be created.\n")
+      }
+    }
+  }
+} else {
+  cat("   - Warning: No top keywords identified for yearly Sankey. Skipping.\n")
+}
+
+
+# --- 9. Decade-Based Keyword Evolution (Sankey Diagram) --- <<< RENUMBERED >>>
+cat("\n--- 9. Generating Decade-Based Keyword Evolution Sankey ---\n")
+
+sankey_plot_obj_decades <- NULL
+
+# 9a. Aggregate by Decade and Calculate Frequencies
+cat("   - Aggregating by Decade and Calculating Frequencies (using unique paper/keyword counts per decade)...\n")
+keywords_decades <- keywords_long %>%
+  filter(!is.na(year)) %>%
+  mutate(decade = floor(year / 10) * 10) %>% # Calculate decade
+  select(paper_id, decade, keyword) %>%
+  distinct() # Count each keyword only once per paper within a decade
+
+keyword_decade_counts <- keywords_decades %>%
+  count(decade, keyword, name = "count") %>%
+  arrange(decade, desc(count))
+
+if(nrow(keyword_decade_counts) == 0){
+  cat("   - Warning: No keyword counts per decade found. Skipping Decade Sankey.\n")
+} else {
+  cat("   - Decade counts calculated.\n")
+  
+  # 9b. Identify Top Keywords for Each Decade
+  cat("   - Identifying top", num_top_keywords_per_decade, "keywords per decade...\n")
+  top_keywords_per_decade <- keyword_decade_counts %>%
+    group_by(decade) %>%
+    slice_max(order_by = count, n = num_top_keywords_per_decade, with_ties = FALSE) %>%
+    ungroup()
+  
+  keywords_to_track <- unique(top_keywords_per_decade$keyword)
+  
+  if(length(keywords_to_track) == 0) {
+    cat("   - Warning: No top keywords identified across decades to track. Skipping Decade Sankey.\n")
+  } else {
+    cat("     > Total unique keywords to track (top", num_top_keywords_per_decade, "in any decade):", length(keywords_to_track), "\n")
+    
+    # Filter the counts to only include these keywords
+    sankey_base_data_dec <- keyword_decade_counts %>%
+      filter(keyword %in% keywords_to_track)
+    
+    if(nrow(sankey_base_data_dec) == 0){
+      cat("   - Warning: No counts found for selected keywords to track. Skipping Decade Sankey.\n")
+    } else {
+      
+      # 9c. Prepare Nodes and Links for Decade Sankey
+      cat("   - Preparing nodes and links for Decade Sankey...\n")
+      nodes_df_dec <- sankey_base_data_dec %>%
+        mutate(name = paste0(decade, "s: ", keyword)) %>% # Node label: "2000s: coevolution"
+        select(name) %>%
+        distinct() %>%
+        mutate(id = row_number() - 1)
+      
+      decade_list <- sort(unique(sankey_base_data_dec$decade))
+      links_list_dec <- list()
+      
+      if (length(decade_list) > 1) {
+        for (i in 1:(length(decade_list) - 1)) {
+          current_decade <- decade_list[i]
+          next_decade <- decade_list[i+1]
+          
+          current_decade_data <- sankey_base_data_dec %>% filter(decade == current_decade)
+          next_decade_data <- sankey_base_data_dec %>% filter(decade == next_decade)
+          common_keywords <- intersect(current_decade_data$keyword, next_decade_data$keyword)
+          
+          if (length(common_keywords) > 0) {
+            temp_links_dec <- tibble(keyword = common_keywords) %>%
+              mutate(source_name = paste0(current_decade, "s: ", keyword)) %>%
+              left_join(nodes_df_dec %>% select(name, source_id = id), by = c("source_name" = "name")) %>%
+              mutate(target_name = paste0(next_decade, "s: ", keyword)) %>%
+              left_join(nodes_df_dec %>% select(name, target_id = id), by = c("target_name" = "name")) %>%
+              # Link value is the count in the *target* decade (flow into that decade)
+              left_join(next_decade_data %>% select(keyword, value = count), by = "keyword") %>%
+              filter(!is.na(source_id), !is.na(target_id), !is.na(value), value > 0) %>%
+              select(source = source_id, target = target_id, value = value, group = keyword)
+            
+            if(nrow(temp_links_dec) > 0){
+              links_list_dec[[as.character(current_decade)]] <- temp_links_dec
+            }
+          }
+        } # End for loop
+      } # End if length(decade_list) > 1
+      
+      if (length(links_list_dec) > 0) {
+        links_df_dec <- bind_rows(links_list_dec)
+      } else {
+        links_df_dec <- tibble(source = integer(), target = integer(), value = numeric(), group = character()) # Empty tibble
+      }
+      
+      if (nrow(nodes_df_dec) == 0 || nrow(links_df_dec) == 0) {
+        cat("   - Warning: Could not create valid nodes or links for Decade Sankey. Skipping.\n")
+      } else {
+        cat("     > Decade Nodes:", nrow(nodes_df_dec), "; Decade Links:", nrow(links_df_dec), "created.\n")
+        
+        # 9d. Generate Decade Sankey Diagram
+        cat("   - Creating Decade Sankey plot object...\n")
+        num_groups_dec <- length(unique(links_df_dec$group))
+        if (num_groups_dec <= 12 && num_groups_dec > 0) {
+          color_palette_dec <- RColorBrewer::brewer.pal(max(3, num_groups_dec), "Paired")[1:num_groups_dec]
+          color_scale_js_dec <- paste0('d3.scaleOrdinal(["', paste(color_palette_dec, collapse = '","'), '"]);')
+        } else if (num_groups_dec > 12) {
+          color_scale_js_dec <- 'd3.scaleOrdinal(d3.schemeCategory10);'
+          cat("     > Warning: >12 keyword groups for Decade Sankey, colors may repeat.\n")
+        } else {
+          color_scale_js_dec <- 'd3.scaleOrdinal(["#cccccc"]);' # Default grey
+        }
+        
+        
+        sankey_plot_obj_decades <- sankeyNetwork(
+          Links = links_df_dec, Nodes = nodes_df_dec, Source = "source",
+          Target = "target", Value = "value", NodeID = "name",
+          LinkGroup = "group", NodeGroup = NULL, units = "Papers",
+          fontSize = 10, nodeWidth = 35, nodePadding = 10, # Adjusted node width/padding
+          sinksRight = FALSE, # Keep temporal flow L->R
+          colourScale = JS(color_scale_js_dec),
+          margin = list(top=5, bottom=5, left=5, right=5)
+        )
+        
+        # 9e. Visualize Decade Sankey (Print to RStudio Viewer Pane)
+        if(!is.null(sankey_plot_obj_decades)){
+          cat("   - Plotting Decade Sankey Diagram (Check RStudio Viewer Pane)...\n")
+          sankey_title_dec <- paste0("Evolution of Top ", num_top_keywords_per_decade, " Keywords by Decade (Simulated)")
+          sankey_plot_obj_dec_title <- htmlwidgets::prependContent(sankey_plot_obj_decades,
+                                                                   htmltools::h3(sankey_title_dec, style = "text-align:center;"))
+          print(sankey_plot_obj_dec_title)
+        } else {
+          cat("     > Warning: Decade Sankey plot object is NULL.\n")
+        }
+      } # End else block for valid decade nodes/links
+    } # End else block for valid base data
+  } # End else block for valid tracked keywords
+} # End else block for valid decade counts
+
+
+# --- 10. Conclusion --- <<< RENUMBERED >>>
+cat("\n--- 10. Script Finished ---\n")
+cat("Analysis complete. Check the RStudio Plots and Viewer panes for visualizations:\n")
+cat(" - Word Cloud (Plots)\n") # Moved up
+cat(" - Co-occurrence Network (Plots)\n")
+cat(" - Thematic Map (Plots)\n")
+cat(" - Yearly Sankey (Viewer)\n")
+cat(" - Decade Sankey (Viewer)\n")
+
+# Clean up graphics device state if needed (optional)
+# if (!is.null(dev.list())) graphics.off()
+# par(mar = c(5.1, 4.1, 4.1, 2.1), mfrow = c(1, 1))
