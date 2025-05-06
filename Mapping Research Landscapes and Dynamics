@@ -87,7 +87,7 @@ cat("Top overall keywords (based on number of papers):\n")
 print(head(keyword_total_freq))
 
 
-# --- 5. Word Cloud ---  <<< MOVED HERE & RENUMBERED >>>
+# --- 5. Word Cloud --- 
 cat("\n--- 5. Generating Word Cloud ---\n")
 
 if (exists("keyword_total_freq") && nrow(keyword_total_freq) > 0) {
@@ -112,7 +112,7 @@ if (exists("keyword_total_freq") && nrow(keyword_total_freq) > 0) {
 }
 
 
-# --- 6. Keyword Co-occurrence Network Analysis --- <<< RENUMBERED >>>
+# --- 6. Keyword Co-occurrence Network Analysis
 cat("\n--- 6. Building Keyword Co-occurrence Network ---\n")
 # (Uses keywords_long which contains year info, but pairs are per paper regardless of year)
 
@@ -236,7 +236,7 @@ if (!is.null(graph_plot_obj)) {
 }
 
 
-# --- 7. Thematic Map Analysis --- <<< RENUMBERED >>>
+# --- 7. Thematic Map Analysis ---
 cat("\n--- 7. Generating Thematic Map (Callon's Metrics) ---\n")
 
 # Helper function (define before use)
@@ -343,7 +343,7 @@ if (!is.null(graph_plot_obj) && !is.null(communities) && length(unique(membershi
 }
 
 
-# --- 8. Yearly Keyword Trend Analysis (Sankey Diagram) --- <<< RENUMBERED >>>
+# --- 8. Yearly Keyword Trend Analysis (Sankey Diagram) ---
 cat("\n--- 8. Generating Yearly Keyword Trend Sankey Diagram ---\n")
 
 sankey_plot_obj_yearly <- NULL
@@ -431,7 +431,7 @@ if(length(top_keywords_yearly) > 0){
 }
 
 
-# --- 9. Decade-Based Keyword Evolution (Sankey Diagram) --- <<< RENUMBERED >>>
+# --- 9. Decade-Based Keyword Evolution (Sankey Diagram) ---
 cat("\n--- 9. Generating Decade-Based Keyword Evolution Sankey ---\n")
 
 sankey_plot_obj_decades <- NULL
