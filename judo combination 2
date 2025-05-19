@@ -1,32 +1,11 @@
-# --------------------------------------------------------------------------
-# Judo Attack Combinations Network Analysis
-# --------------------------------------------------------------------------
-
-# -----------------------------
-# 0. Load Required Libraries
-# -----------------------------
-cat("--- 0. Loading Libraries ---\n")
-# Core graph manipulation
+##Packages 
 library(igraph)
-
-# Tidygraph and ggraph for modern graph analysis and visualization
-library(tidygraph)
-library(ggraph)
-
-# Standard plotting and data manipulation
 library(ggplot2)
-library(dplyr) # For data frame manipulation like select, arrange
-library(tidyr) # For pivot_longer
-
-# Color palettes
+library(dplyr)
+library(tidyr)
 library(RColorBrewer)
-library(viridis) # For viridis color scales
+library(poweRlaw) 
 
-# Specific centrality measures
-library(influential) # For IVI centrality
-
-# 3D plotting
-library(rgl)
 
 
 # -----------------------------
@@ -37,400 +16,120 @@ cat("\n--- 1. Creating Directed Graph of Judo Attack Combinations ---\n")
 # Define the attack combinations using igraph's formula notation
 # Using -+ for DIRECTED edges (from first to second technique)
 attack_combinations_igraph=graph.formula(
-  Seoi.nage--Seoi.otoshi,
-  Seoi.nage--O.uchi.gari,
-  Seoi.nage--Ko.uchi.gari,
-  Ippon.seoi.nage--Ippon.seoi.nage,
-  Ippon.seoi.nage--Seoi.otoshi,
-  Ippon.seoi.nage--Ko.uchi.gari,
-  Ippon.seoi.nage--Osoto.gari,
-  Harai.goshi--Osoto.gari,
-  Harai.goshi--Uchi.mata,
-  Harai.goshi--Soto.makikomi,
-  Uchi.mata--O.uchi.gari,
-  Uchi.mata--Ko.uchi.gari,
-  O.goshi--O.uchi.gari,
-  O.goshi--Ko.uchi.gari,
-  O.goshi--Harai.goshi,
-  O.uchi.gari--Uchi.mata,
-  O.uchi.gari--Ko.uchi.gari,
-  O.uchi.gari--Osoto.gari,
-  O.uchi.gari--Tai.otoshi,
-  O.uchi.gari--Harai.goshi,
-  Ko.uchi.gari--O.uchi.gari,
-  Ko.uchi.gari--Seoi.nage,
-  Ko.uchi.gari--Ippon.seoi.nage,
-  Ko.uchi.gari--Hane.goshi,
-  Osoto.gari--Harai.goshi,
-  Osoto.gari--Osoto.gari,
-  Osoto.gari--O.uchi.gari,
-  Osoto.gari--Ko.soto.gake,
-  Osoto.gari--Sasae.tsurikomi.ashi,
-  Osoto.gari--Okuri.ashi.harai,
-  Osoto.gari--Hiza.guruma,
-  Ko.soto.gari--Ko.soto.gari,
-  Ko.soto.gari--Osoto.gari,
-  Ko.soto.gari--Tai.otoshi,
-  Ko.soto.gari--Harai.goshi,
-  Hiza.guruma--Harai.goshi,
-  Hiza.guruma--Sasae.tsurikomi.ashi,
-  Hiza.guruma--Osoto.gari,
-  Hiza.guruma--De.ashi.harai,
-  Hiza.guruma--Hiza.guruma,
-  Okuri.ashi.harai--Sode.tsuri.komi.goshi,
-  Okuri.ashi.harai--Tai.otoshi,
-  Okuri.ashi.harai--Harai.goshi,
-  Okuri.ashi.harai--Ippon.seoi.nage,
-  Okuri.ashi.harai--Seoi.nage,
-  Tai.otoshi--Tai.otoshi,
-  Tai.otoshi--Ko.uchi.gari,
-  Tai.otoshi--O.uchi.gari,
-  Hikikomi.gaeshi--O.uchi.gari,
-  Hikikomi.gaeshi--Ko.uchi.gari,
-  Hikikomi.gaeshi--Harai.goshi,
-  Hikikomi.gaeshi--Ko.soto.gari,
-  Hikikomi.gaeshi--Sukui.nage,
-  Uchi.mata--O.uchi.gari,
-  Tsuri.komi.goshi--O.uchi.gari,
-  Tsuri.komi.goshi--Sode.tsuri.komi.goshi,
-  Tsuri.komi.goshi--Tsuri.komi.goshi,
-  Hane.goshi--O.uchi.gari,
-  Sasae.tsurikomi.ashi--Uchi.mata,
-  Sasae.tsurikomi.ashi--Tai.otoshi
+  Seoi.nage-+Seoi.otoshi,
+  Seoi.nage-+O.uchi.gari,
+  Seoi.nage-+Ko.uchi.gari,
+  Ippon.seoi.nage-+Ippon.seoi.nage,
+  Ippon.seoi.nage-+Seoi.otoshi,
+  Ippon.seoi.nage-+Ko.uchi.gari,
+  Ippon.seoi.nage-+Osoto.gari,
+  Harai.goshi-+Osoto.gari,
+  Harai.goshi-+Uchi.mata,
+  Harai.goshi-+Soto.makikomi,
+  Uchi.mata-+O.uchi.gari,
+  Uchi.mata-+Ko.uchi.gari,
+  O.goshi-+O.uchi.gari,
+  O.goshi-+Ko.uchi.gari,
+  O.goshi-+Harai.goshi,
+  O.uchi.gari-+Uchi.mata,
+  O.uchi.gari-+Ko.uchi.gari,
+  O.uchi.gari-+Osoto.gari,
+  O.uchi.gari-+Tai.otoshi,
+  O.uchi.gari-+Harai.goshi,
+  Ko.uchi.gari-+O.uchi.gari,
+  Ko.uchi.gari-+Seoi.nage,
+  Ko.uchi.gari-+Ippon.seoi.nage,
+  Ko.uchi.gari-+Hane.goshi,
+  Osoto.gari-+Harai.goshi,
+  Osoto.gari-+Osoto.gari,
+  Osoto.gari-+O.uchi.gari,
+  Osoto.gari-+Ko.soto.gake,
+  Osoto.gari-+Sasae.tsurikomi.ashi,
+  Osoto.gari-+Okuri.ashi.harai,
+  Osoto.gari-+Hiza.guruma,
+  Ko.soto.gari-+Ko.soto.gari,
+  Ko.soto.gari-+Osoto.gari,
+  Ko.soto.gari-+Tai.otoshi,
+  Ko.soto.gari-+Harai.goshi,
+  Hiza.guruma-+Harai.goshi,
+  Hiza.guruma-+Sasae.tsurikomi.ashi,
+  Hiza.guruma-+Osoto.gari,
+  Hiza.guruma-+De.ashi.harai,
+  Hiza.guruma-+Hiza.guruma,
+  Okuri.ashi.harai-+Sode.tsuri.komi.goshi,
+  Okuri.ashi.harai-+Tai.otoshi,
+  Okuri.ashi.harai-+Harai.goshi,
+  Okuri.ashi.harai-+Ippon.seoi.nage,
+  Okuri.ashi.harai-+Seoi.nage,
+  Tai.otoshi-+Tai.otoshi,
+  Tai.otoshi-+Ko.uchi.gari,
+  Tai.otoshi-+O.uchi.gari,
+  Hikikomi.gaeshi-+O.uchi.gari,
+  Hikikomi.gaeshi-+Ko.uchi.gari,
+  Hikikomi.gaeshi-+Harai.goshi,
+  Hikikomi.gaeshi-+Ko.soto.gari,
+  Hikikomi.gaeshi-+Sukui.nage,
+  Uchi.mata-+O.uchi.gari,
+  Tsuri.komi.goshi-+O.uchi.gari,
+  Tsuri.komi.goshi-+Sode.tsuri.komi.goshi,
+  Tsuri.komi.goshi-+Tsuri.komi.goshi,
+  Hane.goshi-+O.uchi.gari,
+  Sasae.tsurikomi.ashi-+Uchi.mata,
+  Sasae.tsurikomi.ashi-+Tai.otoshi
 )
-# Optional: If you want to remove any multiple edges between the same two nodes
-# (keeping one) and/or remove self-loops (like X-+X).
-# Given your formula includes self-loops, you might want to keep them.
-# If you want to remove them for certain analyses:
-# attack_combinations_igraph_simplified <- simplify(attack_combinations_igraph, remove.multiple = TRUE, remove.loops = TRUE)
-# For now, we use the graph as defined, including intentional self-loops.
 
-# Convert to a tidygraph object for easier manipulation with dplyr verbs and ggraph
-attack_graph_tidy <- as_tbl_graph(attack_combinations_igraph, directed = TRUE) # Ensure directed is TRUE
+# 1. Calculate Degrees
+node_names <- V(attack_combinations_igraph)$name
+in_degree <- degree(attack_combinations_igraph, mode = "in")
+out_degree <- degree(attack_combinations_igraph, mode = "out")
+total_degree <- degree(attack_combinations_igraph, mode = "total") # Sum of in and out
 
-cat("Number of techniques (nodes):", gorder(attack_graph_tidy), "\n")
-cat("Number of combinations (edges):", gsize(attack_graph_tidy), "\n")
-cat("Is the graph directed?", is_directed(attack_graph_tidy), "\n")
+# Create a data frame for plotting
+degree_df <- data.frame(
+  Technique = node_names,
+  InDegree = in_degree,
+  OutDegree = out_degree,
+  TotalDegree = total_degree
+)
 
+# Print the degree data
+print("Degree Data for each Technique:")
+print(degree_df)
 
-# -----------------------------
-# 2. Calculate Node-Level Metrics
-# -----------------------------
-cat("\n--- 2. Calculating Node-Level Metrics ---\n")
+# --- Plot 1: Bar plot of In, Out, and Total Degrees for each technique ---
 
-attack_graph_tidy <- attack_graph_tidy %>%
-  activate(nodes) %>% # Ensure operations are on nodes
-  mutate(
-    name = V(.)$name, # ensure 'name' column is explicitly here
-    in_degree = centrality_degree(mode = "in"),
-    out_degree = centrality_degree(mode = "out"),
-    total_degree = centrality_degree(mode = "all"),
-    betweenness = centrality_betweenness(directed = TRUE, normalized = TRUE),
-    closeness_out = centrality_closeness(mode = "out", normalized = TRUE),
-    closeness_in = centrality_closeness(mode = "in", normalized = TRUE),
-    eigen_centrality = centrality_eigen(directed = TRUE, scale = TRUE),
-    pagerank = centrality_pagerank(directed = TRUE),
-    clustering_coeff = local_transitivity() # No 'loops' argument here
-  )
-
-# IVI Centrality (from 'influential' package, requires igraph object)
-cat("Calculating IVI Centrality...\n")
-# Use the original igraph object for ivi
-# The `loops` argument in `ivi` refers to whether to consider self-loops in its calculation.
-# Default is TRUE. Setting to FALSE if you want to ignore self-loops for IVI.
-ivi_values <- tryCatch({
-  ivi(graph = attack_combinations_igraph, mode = "all", loops = FALSE)$ivi
-}, error = function(e) {
-  cat("Error in IVI calculation:", e$message, "\n")
-  cat("IVI values will be set to NA.\n")
-  rep(NA_real_, gorder(attack_combinations_igraph))
-})
-
-# Add IVI to the tidygraph object
-# Ensure names match if graph was simplified or nodes reordered (should be fine here)
-attack_graph_tidy <- attack_graph_tidy %>%
-  activate(nodes) %>%
-  mutate(ivi_centrality = ivi_values[match(name, V(attack_combinations_igraph)$name)])
-
-
-# Define a common theme for ggraph plots and a layout
-common_ggtheme <- theme_graph(base_family = "sans") +
-  theme(
-    legend.position = "right",
-    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5, size = 11),
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 8)
-  )
-chosen_layout <- "fr" # Fruchterman-Reingold. Other options: "kk", "nicely", "mds"
-
-
-# -----------------------------
-# 3. Degree Centrality Analysis
-# -----------------------------
-cat("\n--- 3. Degree Centrality Analysis ---\n")
-
-degree_df <- attack_graph_tidy %>%
-  activate(nodes) %>%
-  as_tibble() %>%
-  select(name, in_degree, out_degree, total_degree)
-
-cat("\nTechniques sorted by Out-Degree (Initiators):\n")
-print(degree_df %>% arrange(desc(out_degree)))
-# Judo Interpretation (Out-Degree):
-# High Out-Degree: These are good "initiators" or "combinational hubs."
-
-cat("\nTechniques sorted by In-Degree (Finishers/Common Targets):\n")
-print(degree_df %>% arrange(desc(in_degree)))
-# Judo Interpretation (In-Degree):
-# High In-Degree: These are strong "finishers" or common transitional techniques.
-
-# --- Bar Chart for In/Out Degree ---
+# Reshape data to long format for ggplot
 degree_df_long <- degree_df %>%
-  select(name, in_degree, out_degree) %>%
-  pivot_longer(cols = c("in_degree", "out_degree"), names_to = "degree_type", values_to = "count") %>%
-  mutate(degree_type = recode(degree_type, "in_degree" = "In-Degree", "out_degree" = "Out-Degree"))
+  pivot_longer(cols = c(InDegree, OutDegree, TotalDegree),
+               names_to = "DegreeType",
+               values_to = "DegreeValue") %>%
+  mutate(DegreeType = factor(DegreeType, levels = c("InDegree", "OutDegree", "TotalDegree"))) # Control order
 
-plot_degree_bars <- ggplot(degree_df_long, aes(x = reorder(name, -count), y = count, fill = degree_type)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  scale_fill_manual(values = c("In-Degree" = "skyblue", "Out-Degree" = "coral"), name = "Degree Type") +
-  labs(title = "In-Degree and Out-Degree of Judo Techniques",
-       x = "Technique",
-       y = "Degree Count") +
-  theme_minimal(base_size = 10) +
-  theme(axis.text.x = element_text(angle = 65, hjust = 1, size = 8),
-        plot.title = element_text(hjust = 0.5, face="bold"),
-        legend.position = "top")
-print(plot_degree_bars)
+# Make technique names more readable if too long by adding newlines (optional)
+# This is a bit manual, you might need to adjust based on your actual names
+# degree_df_long$Technique_label <- gsub("\\.", ".\\n", degree_df_long$Technique)
+# For this example, standard names are okay.
 
-# --- Network Plot: Degree Centrality ---
-plot_degree_network <- ggraph(attack_graph_tidy, layout = chosen_layout) +
-  geom_edge_fan(alpha = 0.5, arrow = arrow(length = unit(2.5, 'mm')), strength = 0.5, width=0.5) +
-  geom_node_point(aes(size = total_degree, color = out_degree)) +
-  geom_node_text(aes(label = name), repel = TRUE, size = 2.5, max.overlaps = Inf, 
-                 bg.color = "white", bg.r = 0.05) + # Add background to text for readability
-  scale_color_viridis_c(option = "plasma", name = "Out-Degree") +
-  scale_size_continuous(name = "Total Degree", range = c(3, 10)) +
-  common_ggtheme +
-  labs(title = "Network: Degree Centrality",
-       subtitle = "Node size by Total Degree, Color by Out-Degree")
-print(plot_degree_network)
-
-
-# -----------------------------
-# 4. Betweenness Centrality Analysis
-# -----------------------------
-cat("\n--- 4. Betweenness Centrality Analysis ---\n")
-betweenness_df <- attack_graph_tidy %>% activate(nodes) %>% as_tibble() %>% select(name, betweenness)
-cat("\nTechniques sorted by Betweenness Centrality:\n")
-print(betweenness_df %>% arrange(desc(betweenness)))
-# Judo Interpretation (Betweenness):
-# High Betweenness: Crucial for linking different parts of the attack repertoire.
-
-plot_betweenness_network <- ggraph(attack_graph_tidy, layout = chosen_layout) +
-  geom_edge_fan(alpha = 0.5, arrow = arrow(length = unit(2.5, 'mm')), strength = 0.5, width=0.5) +
-  geom_node_point(aes(size = betweenness, color = betweenness)) +
-  geom_node_text(aes(label = name), repel = TRUE, size = 2.5, max.overlaps = Inf, 
-                 bg.color = "white", bg.r = 0.05) +
-  scale_color_viridis_c(option = "mako", name = "Betweenness") +
-  scale_size_continuous(name = "Betweenness", range = c(3, 10)) + # Ensure size range makes sense for data
-  common_ggtheme +
-  labs(title = "Network: Betweenness Centrality")
-print(plot_betweenness_network)
+degree_plot <- ggplot(degree_df_long, aes(x = reorder(Technique, -DegreeValue), y = DegreeValue, fill = DegreeType)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
+  scale_fill_brewer(palette = "Set2", name = "Degree Type", labels = c("In-Degree (Used As Follow-up)", "Out-Degree (Used As Opener)", "Total Degree")) +
+  labs(
+    title = "Judo Technique Combination Degrees",
+    subtitle = "In-degree: how often a technique is a follow-up.\nOut-degree: how often a technique initiates a combination.",
+    x = "Judo Technique",
+    y = "Degree Count"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 65, hjust = 1, vjust = 1, size = 9),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    legend.position = "top",
+    panel.grid.major.x = element_blank(), # Remove vertical grid lines for cleaner look
+    panel.grid.minor.y = element_blank()
+  ) +
+  geom_text(aes(label=ifelse(DegreeValue > 0, DegreeValue, "")), 
+            position=position_dodge(width=0.9), vjust=-0.25, size=2.5)
 
 
-# -----------------------------
-# 5. Closeness Centrality Analysis
-# -----------------------------
-cat("\n--- 5. Closeness Centrality Analysis ---\n")
-closeness_df <- attack_graph_tidy %>% activate(nodes) %>% as_tibble() %>% select(name, closeness_out, closeness_in)
-cat("\nTechniques sorted by Out-Closeness Centrality:\n")
-print(closeness_df %>% arrange(desc(closeness_out)))
-# Judo Interpretation (Closeness Out):
-# High Closeness (Out): Efficiently initiates sequences leading to many other techniques.
-
-plot_closeness_network <- ggraph(attack_graph_tidy, layout = chosen_layout) +
-  geom_edge_fan(alpha = 0.5, arrow = arrow(length = unit(2.5, 'mm')), strength = 0.5, width=0.5) +
-  geom_node_point(aes(size = closeness_out, color = closeness_out)) +
-  geom_node_text(aes(label = name), repel = TRUE, size = 2.5, max.overlaps = Inf, 
-                 bg.color = "white", bg.r = 0.05) +
-  scale_color_viridis_c(option = "magma", name = "Out-Closeness") +
-  scale_size_continuous(name = "Out-Closeness", range = c(3, 10)) +
-  common_ggtheme +
-  labs(title = "Network: Closeness Centrality (Outgoing)")
-print(plot_closeness_network)
-
-
-# -----------------------------
-# 6. Eigenvector & PageRank Centrality Analysis
-# -----------------------------
-cat("\n--- 6. Eigenvector & PageRank Centrality Analysis ---\n")
-eigen_pagerank_df <- attack_graph_tidy %>% activate(nodes) %>% as_tibble() %>% select(name, eigen_centrality, pagerank)
-cat("\nTechniques sorted by PageRank Centrality:\n")
-print(eigen_pagerank_df %>% arrange(desc(pagerank)))
-# Judo Interpretation (Eigenvector/PageRank):
-# High Eigenvector/PageRank: Highly "important" techniques within the system.
-
-plot_pagerank_network <- ggraph(attack_graph_tidy, layout = chosen_layout) +
-  geom_edge_fan(alpha = 0.5, arrow = arrow(length = unit(2.5, 'mm')), strength = 0.5, width=0.5) +
-  geom_node_point(aes(size = pagerank, color = pagerank)) +
-  geom_node_text(aes(label = name), repel = TRUE, size = 2.5, max.overlaps = Inf, 
-                 bg.color = "white", bg.r = 0.05) +
-  scale_color_viridis_c(option = "rocket", name = "PageRank") +
-  scale_size_continuous(name = "PageRank", range = c(3, 12)) +
-  common_ggtheme +
-  labs(title = "Network: PageRank Centrality")
-print(plot_pagerank_network)
-
-
-# -----------------------------
-# 7. IVI Centrality Analysis
-# -----------------------------
-cat("\n--- 7. IVI Centrality Analysis ---\n")
-ivi_df <- attack_graph_tidy %>% activate(nodes) %>% as_tibble() %>% select(name, ivi_centrality)
-cat("\nTechniques sorted by IVI Centrality:\n")
-# Handle potential NA values in sorting and printing
-if (any(!is.na(ivi_df$ivi_centrality))) {
-  print(ivi_df %>% arrange(desc(ivi_centrality)))
-} else {
-  cat("All IVI centrality values are NA.\n")
-  print(ivi_df)
-}
-
-# Plot IVI Centrality
-if (any(!is.na(V(attack_graph_tidy)$ivi_centrality)) && 
-    length(unique(V(attack_graph_tidy)$ivi_centrality[!is.na(V(attack_graph_tidy)$ivi_centrality)])) > 1) {
-  plot_ivi_network <- ggraph(attack_graph_tidy, layout = chosen_layout) +
-    geom_edge_fan(alpha = 0.5, arrow = arrow(length = unit(2.5, 'mm')), strength = 0.5, width=0.5) +
-    geom_node_point(aes(size = ivi_centrality, color = ivi_centrality)) +
-    geom_node_text(aes(label = name), repel = TRUE, size = 2.5, max.overlaps = Inf, 
-                   bg.color = "white", bg.r = 0.05) +
-    scale_color_viridis_c(option = "cividis", name = "IVI") +
-    scale_size_continuous(name = "IVI", range = c(3, 10)) +
-    common_ggtheme +
-    labs(title = "Network: IVI Centrality")
-  print(plot_ivi_network)
-} else {
-  cat("\nSkipping IVI Centrality network plot as values are NA or uniform.\n")
-}
-
-
-# -----------------------------
-# 8. Clustering Coefficient Analysis
-# -----------------------------
-cat("\n--- 8. Clustering Coefficient Analysis ---\n")
-clustering_df <- attack_graph_tidy %>% activate(nodes) %>% as_tibble() %>% select(name, clustering_coeff, total_degree)
-cat("\nTechniques sorted by Clustering Coefficient:\n")
-if (any(!is.na(clustering_df$clustering_coeff))) {
-  print(clustering_df %>% arrange(desc(clustering_coeff)))
-} else {
-  cat("All Clustering Coefficient values are NA.\n")
-  print(clustering_df)
-}
-# Judo Interpretation (Clustering Coefficient):
-# High Clustering Coefficient: Indicates techniques connected to this technique
-# are also highly connected to each other, forming a tight cluster.
-
-if (any(!is.na(V(attack_graph_tidy)$clustering_coeff)) && 
-    length(unique(V(attack_graph_tidy)$clustering_coeff[!is.na(V(attack_graph_tidy)$clustering_coeff)])) > 1) {
-  plot_clustering_network <- ggraph(attack_graph_tidy, layout = chosen_layout) +
-    geom_edge_fan(alpha = 0.5, arrow = arrow(length = unit(2.5, 'mm')), strength = 0.5, width=0.5) +
-    geom_node_point(aes(size = total_degree, color = clustering_coeff)) + # Size by degree, color by clustering
-    geom_node_text(aes(label = name), repel = TRUE, size = 2.5, max.overlaps = Inf, 
-                   bg.color = "white", bg.r = 0.05) +
-    scale_color_viridis_c(option = "inferno", name = "Clustering Coeff.", na.value = "grey80") +
-    scale_size_continuous(name = "Total Degree", range = c(3, 10)) +
-    common_ggtheme +
-    labs(title = "Network: Clustering Coefficient",
-         subtitle = "Node size by Total Degree, Color by Clustering Coefficient")
-  print(plot_clustering_network)
-} else {
-  cat("\nSkipping Clustering Coefficient network plot as values are NA or uniform.\n")
-}
-
-
-# -----------------------------
-# 9. Motif Analysis (Triads)
-# -----------------------------
-cat("\n--- 9. Motif Analysis (Triads) ---\n")
-
-# Calculate 3-node motifs for the igraph object (triad census)
-motifs3_counts <- triad_census(attack_combinations_igraph) # Use the original igraph object
-
-motifs_df <- data.frame(
-  motif_id = names(motifs3_counts),
-  count = as.numeric(motifs3_counts)
-) %>% filter(count > 0)
-
-if (nrow(motifs_df) > 0) {
-  motif_plot <- ggplot(motifs_df, aes(x = reorder(motif_id, -count), y = count)) +
-    geom_bar(stat = "identity", fill = "darkorange", color = "black") +
-    theme_minimal(base_size = 11) +
-    labs(
-      title = "Motif Frequency (3-Node Triads)",
-      x = "Motif ID (igraph triad_census)",
-      y = "Count"
-    ) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          plot.title = element_text(hjust = 0.5, face="bold"))
-  print(motif_plot)
-  cat("Motif IDs refer to the standard igraph classification (see ?triad_census for interpretation).\n")
-} else {
-  cat("No 3-node motifs found or graph too small for meaningful triad census.\n")
-}
-
-
-# -----------------------------
-# 10. 3D Force Layout Visualization (Optional, using rgl)
-# -----------------------------
-cat("\n--- 10. 3D Visualization (Optional, using rgl) ---\n")
-cat("If rgl window does not appear automatically, you might need to run rgl.open() or check your graphics device.\n")
-
-if (requireNamespace("rgl", quietly = TRUE)) {
-  tryCatch({
-    coords_3d <- layout_with_fr(attack_combinations_igraph, dim = 3)
-    node_labels <- V(attack_combinations_igraph)$name
-    
-    pagerank_values_for_3d <- V(attack_graph_tidy)$pagerank # Get from tidygraph
-    
-    if (all(is.na(pagerank_values_for_3d)) || length(unique(na.omit(pagerank_values_for_3d))) <=1 ) {
-      node_colors_3d <- "skyblue"
-    } else {
-      num_colors <- 100
-      palette_fn <- viridis::viridis_pal(option = "D")(num_colors)
-      pr_norm <- scales::rescale(pagerank_values_for_3d, to = c(0,1))
-      node_colors_3d <- palette_fn[floor(pr_norm * (num_colors - 1)) + 1]
-      node_colors_3d[is.na(node_colors_3d)] <- "grey"
-    }
-    
-    total_degree_values_for_3d <- V(attack_graph_tidy)$total_degree
-    node_sizes_3d <- scales::rescale(total_degree_values_for_3d, to = c(4, 12), from = range(total_degree_values_for_3d, na.rm = TRUE))
-    node_sizes_3d[is.na(node_sizes_3d) | is.nan(node_sizes_3d)] <- 5
-    
-    rgl::open3d() # Use rgl::open3d() to be explicit
-    rgl::bg3d(color = "white")
-    
-    # Plot directly using rgl functions for more control
-    rgl::plot3d(coords_3d, type = "n", xlab="", ylab="", zlab="", axes=FALSE) # Setup scene
-    rgl::spheres3d(coords_3d, radius = node_sizes_3d/150, color = node_colors_3d) # Adjust radius scaling
-    
-    # Add edges
-    edges_3d <- as_data_frame(attack_combinations_igraph, what="edges")
-    for(i in 1:nrow(edges_3d)){
-      rgl::segments3d(rbind(coords_3d[edges_3d$from[i],], coords_3d[edges_3d$to[i],]), col="gray50", lwd=1.5)
-      # Add arrows (can be computationally intensive for many edges)
-      # rgl::arrow3d(p0=coords_3d[edges_3d$from[i],], p1=coords_3d[edges_3d$to[i],], type="rotation", col="gray40", s=0.03, n=3)
-    }
-    rgl::texts3d(coords_3d + 0.02, text = node_labels, col = "black", cex = 0.7, adj = c(0.5, -0.5)) # Offset labels slightly
-    rgl::title3d("3D Judo Attack Network", sub = "Size by Total Degree, Color by PageRank", col="black")
-    
-    cat("3D plot generated. You can interact with it in the rgl window.\n")
-    
-  }, error = function(e) {
-    cat("Error generating 3D plot with rgl:", e$message, "\n")
-  })
-} else {
-  cat("Package 'rgl' not available. Skipping 3D plot.\n")
-}
-
-cat("\n--- Analysis Complete ---\n")
+print(degree_plot)
