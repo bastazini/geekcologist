@@ -1,10 +1,14 @@
 ##Packages 
-library(igraph)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(RColorBrewer)
-library(poweRlaw) 
+require(igraph)
+require(ggplot2)
+require(dplyr)
+require(tidyr)
+require(RColorBrewer)
+require(bipartite) 
+require(bbmle)
+require(influential)
+
+
 
 
 
@@ -69,7 +73,6 @@ attack_combinations_igraph=graph.formula(
   Hikikomi.gaeshi-+Harai.goshi,
   Hikikomi.gaeshi-+Ko.soto.gari,
   Hikikomi.gaeshi-+Sukui.nage,
-  Uchi.mata-+O.uchi.gari,
   Tsuri.komi.goshi-+O.uchi.gari,
   Tsuri.komi.goshi-+Sode.tsuri.komi.goshi,
   Tsuri.komi.goshi-+Tsuri.komi.goshi,
@@ -80,9 +83,9 @@ attack_combinations_igraph=graph.formula(
 
 # 1. Calculate Degrees
 node_names <- V(attack_combinations_igraph)$name
-in_degree <- degree(attack_combinations_igraph, mode = "in")
-out_degree <- degree(attack_combinations_igraph, mode = "out")
-total_degree <- degree(attack_combinations_igraph, mode = "total") # Sum of in and out
+in_degree <- igraph::degree(attack_combinations_igraph, mode = "in")
+out_degree <- igraph::degree(attack_combinations_igraph, mode = "out")
+total_degree <- igraph::degree(attack_combinations_igraph, mode = "all")
 
 # Create a data frame for plotting
 degree_df <- data.frame(
@@ -100,10 +103,10 @@ print(degree_df)
 
 # Reshape data to long format for ggplot
 degree_df_long <- degree_df %>%
-  pivot_longer(cols = c(InDegree, OutDegree, TotalDegree),
+  pivot_longer(cols = c(InDegree, OutDegree),
                names_to = "DegreeType",
                values_to = "DegreeValue") %>%
-  mutate(DegreeType = factor(DegreeType, levels = c("InDegree", "OutDegree", "TotalDegree"))) # Control order
+  mutate(DegreeType = factor(DegreeType, levels = c("InDegree", "OutDegree"))) # Control order
 
 # Make technique names more readable if too long by adding newlines (optional)
 # This is a bit manual, you might need to adjust based on your actual names
@@ -112,7 +115,7 @@ degree_df_long <- degree_df %>%
 
 degree_plot <- ggplot(degree_df_long, aes(x = reorder(Technique, -DegreeValue), y = DegreeValue, fill = DegreeType)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
-  scale_fill_brewer(palette = "Set2", name = "Degree Type", labels = c("In-Degree (Used As Follow-up)", "Out-Degree (Used As Opener)", "Total Degree")) +
+  scale_fill_brewer(palette = "Set2", name = "Degree Type", labels = c("In-Degree", "Out-Degree")) +
   labs(
     title = "Judo Technique Combination Degrees",
     subtitle = "In-degree: how often a technique is a follow-up.\nOut-degree: how often a technique initiates a combination.",
@@ -133,3 +136,69 @@ degree_plot <- ggplot(degree_df_long, aes(x = reorder(Technique, -DegreeValue), 
 
 
 print(degree_plot)
+
+
+# --- Plot 2: Cumulative Degree Distribution Plot (for Total Degree) ---
+# Load required libraries
+
+# Compute cumulative degree distribution
+deg <- degree_distribution(attack_combinations_igraph, cumulative = TRUE, mode = "all")
+deg_table <- data.frame(
+  Degree = 0:(length(deg) - 1),
+  CumulativeProbability = deg
+)
+
+# 2. Remove zeros (nls can't handle log(0) or fit to 0)
+deg_table <- deg_table[deg_table$Degree > 0 & deg_table$CumulativeProbability > 0, ]
+
+# 3. Fit power-law model: P(k) = a * k^(-b)
+pl_model <- nls(CumulativeProbability ~ a * Degree^(-b),
+                data = deg_table,
+                start = list(a = 1, b = 2),
+                control = nls.control(warnOnly = TRUE))
+
+# 4. Fit exponential model: P(k) = a * exp(-b * k)
+exp_model <- nls(CumulativeProbability ~ a * exp(-b * Degree),
+                 data = deg_table,
+                 start = list(a = 1, b = 0.1),
+                 control = nls.control(warnOnly = TRUE))
+
+# 5. Fit truncated power-law: P(k) = a * k^(-b) * exp(-c * k)
+tpl_model <- nls(CumulativeProbability ~ a * Degree^(-b) * exp(-c * Degree),
+                 data = deg_table,
+                 start = list(a = 1, b = 1.5, c = 0.05),
+                 control = nls.control(warnOnly = TRUE))
+# 6. Compare models using AIC
+AICctab(pl_model,exp_model,tpl_model,nobs=length(deg),weights = TRUE, delta = TRUE, base = TRUE)
+
+# --- Plot Cumulative Distribution and Model Fits (log-log scale) ---
+plot(deg_table$Degree, deg_table$CumulativeProbability, 
+     log = "xy", pch = 16,
+     xlab = "Degree", ylab = "P(K ≥ k)", 
+     main = "Cumulative Degree Distribution (log-log)")
+
+curve(coef(pl_model)[1] * x^(-coef(pl_model)[2]), 
+      add = TRUE, col = "blue", lwd = 2)
+curve(coef(exp_model)[1] * exp(-coef(exp_model)[2] * x), 
+      add = TRUE, col = "red", lwd = 2)
+curve(coef(tpl_model)[1] * x^(-coef(tpl_model)[2]) * exp(-coef(tpl_model)[3] * x), 
+      add = TRUE, col = "darkgreen", lwd = 2)
+
+legend("bottomleft", legend = c("Power-law", "Exponential", "Truncated PL"),
+       col = c("blue", "red", "darkgreen"), lwd = 2)
+
+# Compute IVI
+Graph_IVI <- ivi(attack_combinations_igraph, mode = "all")
+
+# Plot IVI using cent_network.vis (supported arguments only)
+cent_network.vis(
+  graph = attack_combinations_igraph,
+  cent.metric = Graph_IVI,
+  legend.title = "IVI",
+  plot.title = "Attack Combination Network – IVI",
+  layout = "kk",                  # Kamada-Kawai layout
+  dist.power = 1.5,
+  legend.position = "right",
+  boxed.legend = TRUE,
+  show.labels = TRUE              # You can toggle this
+)
