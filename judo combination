@@ -303,3 +303,6 @@ layout_fr <- layout_with_fr(attack_combinations_igraph)
 
 plot(ceb, attack_combinations_igraph, layout = layout_fr,
      main = "Technique Clusters")
+legend("topright", legend = paste("Cluster", 1:length(ceb)),
+       col = rainbow(length(ceb)), pch = 21, pt.bg = rainbow(length(ceb)),
+       bty = "n", cex = 0.8)
