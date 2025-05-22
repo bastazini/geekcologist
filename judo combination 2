@@ -1,4 +1,12 @@
-##Packages 
+
+
+
+
+
+
+rm(list = ls())
+
+## Packages 
 require(igraph)
 require(ggplot2)
 require(dplyr)
@@ -7,10 +15,12 @@ require(RColorBrewer)
 require(bipartite) 
 require(bbmle)
 require(influential)
+require(visNetwork)
 
-
-
-
+# -----------------------------
+# 1. Build the Graph (directed)
+# -----------------------------
+cat("\n--- 1. Creating Directed Graph of Judo Attack Combinations ---\n")
 
 # -----------------------------
 # 1. Build the Graph (directed)
@@ -80,14 +90,60 @@ attack_combinations_igraph=graph.formula(
   Sasae.tsurikomi.ashi-+Uchi.mata,
   Sasae.tsurikomi.ashi-+Tai.otoshi
 )
+# Create a uniform node dataframe for use with visNetwork
+nodes <- data.frame(
+  id = V(attack_combinations_igraph)$name,
+  label = V(attack_combinations_igraph)$name,
+  value = 15,  # All nodes same visual size
+  color = "lightblue",
+  font = list(color = "black")
+)
 
-# 1. Calculate Degrees
+# Extract edge list from the igraph object
+edges <- igraph::as_data_frame(attack_combinations_igraph, what = "edges")
+
+# -----------------------------
+# 2. Interactive Network Plot
+# -----------------------------
+cat("\n--- 2. Interactive Network Plot using visNetwork ---\n")
+
+# Build interactive graph with directional arrows and physics layout
+visNetwork(nodes, edges, main = "🥋 Judo Attack Combinations Network") %>%
+  visNodes(font = list(size = 18)) %>%
+  visEdges(
+    arrows = "to",  # Show arrowheads
+    color = list(color = "black", highlight = "black", hover = "black")
+  ) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+  visPhysics(
+    solver = "forceAtlas2Based",
+    forceAtlas2Based = list(gravitationalConstant = -50),
+    stabilization = TRUE
+  )
+
+# Save the interactive graph as a self-contained HTML
+saveWidget(
+  visNetwork(nodes, edges, main = "🥋 Judo Attack Combinations Network") %>%
+    visNodes(font = list(size = 18)) %>%
+    visEdges(arrows = "to", color = list(color = "black", highlight = "black", hover = "black")) %>%
+    visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
+    visPhysics(solver = "forceAtlas2Based", forceAtlas2Based = list(gravitationalConstant = -50), stabilization = TRUE),
+  file = "judo_attack_network.html",
+  selfcontained = TRUE
+)
+
+# -----------------------------
+# 3. Degree Calculation
+# -----------------------------
+cat("\n--- 3. Calculating In, Out, and Total Degrees for Techniques ---\n")
+
+# Compute degrees for each node
 node_names <- V(attack_combinations_igraph)$name
-in_degree <- igraph::degree(attack_combinations_igraph, mode = "in")
-out_degree <- igraph::degree(attack_combinations_igraph, mode = "out")
-total_degree <- igraph::degree(attack_combinations_igraph, mode = "all")
+in_degree <- degree(attack_combinations_igraph, mode = "in")
+out_degree <- degree(attack_combinations_igraph, mode = "out")
+total_degree <- degree(attack_combinations_igraph, mode = "all")
 
-# Create a data frame for plotting
+# Create data frame summarizing degrees
 degree_df <- data.frame(
   Technique = node_names,
   InDegree = in_degree,
@@ -95,30 +151,67 @@ degree_df <- data.frame(
   TotalDegree = total_degree
 )
 
-# Print the degree data
+# Output summary
 print("Degree Data for each Technique:")
 print(degree_df)
 
-# --- Plot 1: Bar plot of In, Out, and Total Degrees for each technique ---
+# -----------------------------
+# 4. Plot Network by Degree
+# -----------------------------
+cat("\n--- 4. Plotting Networks Based on Degree ---\n")
 
-# Reshape data to long format for ggplot
+# Set layout to be consistent across plots
+set.seed(42)
+layout_fr <- layout_with_fr(attack_combinations_igraph)
+
+# Plot with in-degree node sizes
+V(attack_combinations_igraph)$size <- in_degree * 2 + 5
+V(attack_combinations_igraph)$label <- V(attack_combinations_igraph)$name
+V(attack_combinations_igraph)$label.cex <- 0.7
+V(attack_combinations_igraph)$label.color <- "black"
+V(attack_combinations_igraph)$color <- "lightblue"
+E(attack_combinations_igraph)$arrow.size <- 0.4
+E(attack_combinations_igraph)$color <- "gray30"
+
+plot1 <- function() {
+  plot(attack_combinations_igraph, layout = layout_fr, main = "In-Degree Network")
+}
+
+# Plot with out-degree node sizes
+V(attack_combinations_igraph)$size <- out_degree * 2 + 5
+
+plot2 <- function() {
+  plot(attack_combinations_igraph, layout = layout_fr, main = "Out-Degree Network")
+}
+
+# Combined panel plot
+par(mfrow = c(1, 2), mar = c(1, 1, 4, 1))
+plot1()
+plot2()
+
+legend("bottom", inset = -0.2, legend = c("Low Degree", "Medium", "High"),
+       pt.cex = c(6, 10, 14) / 5, pch = 21, pt.bg = "lightblue", col = "black",
+       bty = "n", horiz = TRUE, title = "Node Size (Degree Scale)")
+
+# -----------------------------
+# 5. Bar Plot of Degrees
+# -----------------------------
+cat("\n--- 5. Plotting Degree Bar Charts ---\n")
+
+# Transform data to long format for ggplot
 degree_df_long <- degree_df %>%
   pivot_longer(cols = c(InDegree, OutDegree),
                names_to = "DegreeType",
                values_to = "DegreeValue") %>%
-  mutate(DegreeType = factor(DegreeType, levels = c("InDegree", "OutDegree"))) # Control order
+  mutate(DegreeType = factor(DegreeType, levels = c("InDegree", "OutDegree")))
 
-# Make technique names more readable if too long by adding newlines (optional)
-# This is a bit manual, you might need to adjust based on your actual names
-# degree_df_long$Technique_label <- gsub("\\.", ".\\n", degree_df_long$Technique)
-# For this example, standard names are okay.
-
+# Create grouped bar chart
 degree_plot <- ggplot(degree_df_long, aes(x = reorder(Technique, -DegreeValue), y = DegreeValue, fill = DegreeType)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
   scale_fill_brewer(palette = "Set2", name = "Degree Type", labels = c("In-Degree", "Out-Degree")) +
   labs(
     title = "Judo Technique Combination Degrees",
-    subtitle = "In-degree: how often a technique is a follow-up.\nOut-degree: how often a technique initiates a combination.",
+    subtitle = "In-degree: follow-up attack\nOut-degree: initiation attack",
     x = "Judo Technique",
     y = "Degree Count"
   ) +
@@ -128,77 +221,91 @@ degree_plot <- ggplot(degree_df_long, aes(x = reorder(Technique, -DegreeValue), 
     plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
     plot.subtitle = element_text(hjust = 0.5, size = 10),
     legend.position = "top",
-    panel.grid.major.x = element_blank(), # Remove vertical grid lines for cleaner look
+    panel.grid.major.x = element_blank(),
     panel.grid.minor.y = element_blank()
   ) +
-  geom_text(aes(label=ifelse(DegreeValue > 0, DegreeValue, "")), 
-            position=position_dodge(width=0.9), vjust=-0.25, size=2.5)
-
+  geom_text(aes(label = ifelse(DegreeValue > 0, DegreeValue, "")),
+            position = position_dodge(width = 0.9), vjust = -0.25, size = 2.5)
 
 print(degree_plot)
 
-
-# --- Plot 2: Cumulative Degree Distribution Plot (for Total Degree) ---
-# Load required libraries
+# -----------------------------
+# 6. Degree Distribution & Model Fitting
+# -----------------------------
+cat("\n--- 6. Degree Distribution & Model Comparison ---\n")
 
 # Compute cumulative degree distribution
 deg <- degree_distribution(attack_combinations_igraph, cumulative = TRUE, mode = "all")
-deg_table <- data.frame(
-  Degree = 0:(length(deg) - 1),
-  CumulativeProbability = deg
-)
+deg_table <- data.frame(Degree = 0:(length(deg) - 1), CumulativeProbability = deg)
 
-# 2. Remove zeros (nls can't handle log(0) or fit to 0)
+# Filter zero values
 deg_table <- deg_table[deg_table$Degree > 0 & deg_table$CumulativeProbability > 0, ]
 
-# 3. Fit power-law model: P(k) = a * k^(-b)
+# Fit power-law
 pl_model <- nls(CumulativeProbability ~ a * Degree^(-b),
-                data = deg_table,
-                start = list(a = 1, b = 2),
+                data = deg_table, start = list(a = 1, b = 2),
                 control = nls.control(warnOnly = TRUE))
 
-# 4. Fit exponential model: P(k) = a * exp(-b * k)
+# Fit exponential
 exp_model <- nls(CumulativeProbability ~ a * exp(-b * Degree),
-                 data = deg_table,
-                 start = list(a = 1, b = 0.1),
+                 data = deg_table, start = list(a = 1, b = 0.1),
                  control = nls.control(warnOnly = TRUE))
 
-# 5. Fit truncated power-law: P(k) = a * k^(-b) * exp(-c * k)
+# Fit truncated power-law
 tpl_model <- nls(CumulativeProbability ~ a * Degree^(-b) * exp(-c * Degree),
-                 data = deg_table,
-                 start = list(a = 1, b = 1.5, c = 0.05),
+                 data = deg_table, start = list(a = 1, b = 1.5, c = 0.05),
                  control = nls.control(warnOnly = TRUE))
-# 6. Compare models using AIC
-AICctab(pl_model,exp_model,tpl_model,nobs=length(deg),weights = TRUE, delta = TRUE, base = TRUE)
 
-# --- Plot Cumulative Distribution and Model Fits (log-log scale) ---
-plot(deg_table$Degree, deg_table$CumulativeProbability, 
-     log = "xy", pch = 16,
-     xlab = "Degree", ylab = "P(K ≥ k)", 
-     main = "Cumulative Degree Distribution (log-log)")
+# Compare models using AIC
+AICctab(pl_model, exp_model, tpl_model, nobs = length(deg), weights = TRUE, delta = TRUE, base = TRUE)
 
-curve(coef(pl_model)[1] * x^(-coef(pl_model)[2]), 
-      add = TRUE, col = "blue", lwd = 2)
-curve(coef(exp_model)[1] * exp(-coef(exp_model)[2] * x), 
-      add = TRUE, col = "red", lwd = 2)
-curve(coef(tpl_model)[1] * x^(-coef(tpl_model)[2]) * exp(-coef(tpl_model)[3] * x), 
+# Plot with fitted models
+plot(deg_table$Degree, deg_table$CumulativeProbability, log = "xy", pch = 16,
+     xlab = "Degree", ylab = "P(K ≥ k)", main = "Cumulative Degree Distribution (log-log)")
+
+curve(coef(pl_model)[1] * x^(-coef(pl_model)[2]), add = TRUE, col = "blue", lwd = 2)
+curve(coef(exp_model)[1] * exp(-coef(exp_model)[2] * x), add = TRUE, col = "red", lwd = 2)
+curve(coef(tpl_model)[1] * x^(-coef(tpl_model)[2]) * exp(-coef(tpl_model)[3] * x),
       add = TRUE, col = "darkgreen", lwd = 2)
 
 legend("bottomleft", legend = c("Power-law", "Exponential", "Truncated PL"),
        col = c("blue", "red", "darkgreen"), lwd = 2)
 
-# Compute IVI
+# -----------------------------
+# 7. IVI (Integrated Value of Influence)
+# -----------------------------
+cat("\n--- 7. Calculating IVI Centrality ---\n")
+
 Graph_IVI <- ivi(attack_combinations_igraph, mode = "all")
 
-# Plot IVI using cent_network.vis (supported arguments only)
 cent_network.vis(
   graph = attack_combinations_igraph,
   cent.metric = Graph_IVI,
   legend.title = "IVI",
   plot.title = "Attack Combination Network – IVI",
-  layout = "kk",                  # Kamada-Kawai layout
+  layout = "kk",
   dist.power = 1.5,
   legend.position = "right",
   boxed.legend = TRUE,
-  show.labels = TRUE              # You can toggle this
+  show.labels = TRUE
 )
+
+# -----------------------------
+# 8. Community Detection
+# -----------------------------
+cat("\n--- 8. Community Detection using Edge Betweenness ---\n")
+
+ceb <- cluster_walktrap(attack_combinations_igraph)
+V(attack_combinations_igraph)$color <- rainbow(length(ceb))[membership(ceb)]
+V(attack_combinations_igraph)$label <- V(attack_combinations_igraph)$name
+V(attack_combinations_igraph)$label.cex <- 0.7
+V(attack_combinations_igraph)$label.color <- "black"
+V(attack_combinations_igraph)$size <- 12
+E(attack_combinations_igraph)$arrow.size <- 0.4
+E(attack_combinations_igraph)$color <- "gray40"
+
+par(mar = c(0.5, 0.5, 0.5, 0.5))
+layout_fr <- layout_with_fr(attack_combinations_igraph)
+
+plot(ceb, attack_combinations_igraph, layout = layout_fr,
+     main = "Technique Clusters")
