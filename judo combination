@@ -85,7 +85,7 @@ attack_combinations_igraph =graph.formula(
   Ko.soto.gake-+Hane.goshi,
   Ko.soto.gake-+Ko.uchi.gari,
   Ko.uchi.gari-+Ko.uchi.makikomi,
-  Uki.goshi+-O.uchi.gari,
+  Uki.goshi-+O.uchi.gari,
   Uki.goshi-+Tsuri.goshi,
   Tsuri.goshi-+O.uchi.gari,
   Koshi.guruma-+Ashi.guruma,
