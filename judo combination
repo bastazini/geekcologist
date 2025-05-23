@@ -99,8 +99,8 @@ attack_combinations_igraph =graph.formula(
   Uchi.mata-+Harai.goshi,
   Tai.otoshi-+Seoi.otoshi,
   Uki.otoshi-+O.uchi.gari,
-  Uki.otoshi-+Tomoe.nage,
-  Koshi.guruma-+Kani.bassami# note that this is an illegl movement
+  Uki.otoshi-+Tomoe.nage
+  #Koshi.guruma-+Kani.bassami# since this is an illegl movement, I'm excluding it
 )
 # Create a uniform node dataframe for use with visNetwork
 nodes <- data.frame(
@@ -187,6 +187,9 @@ E(attack_combinations_igraph)$color <- "gray30"
 
 plot1 <- function() {
   plot(attack_combinations_igraph, layout = layout_fr, main = "In-Degree Network")
+  legend("topleft", legend = c("Low Degree", "Medium", "High"),
+         pt.cex = c(6, 10, 14) / 5, pch = 21, pt.bg = "lightblue", col = "black",
+         bty = "n", title = "Degree Scale")
 }
 
 # Plot with out-degree node sizes
@@ -201,10 +204,7 @@ par(mfrow = c(1, 2), mar = c(1, 1, 4, 1))
 plot1()
 plot2()
 
-legend("bottom", inset = -0.2, legend = c("Low Degree", "Medium", "High"),
-       pt.cex = c(6, 10, 14) / 5, pch = 21, pt.bg = "lightblue", col = "black",
-       bty = "n", horiz = TRUE, title = "Node Size (Degree Scale)")
-
+dev.off()
 # -----------------------------
 # 5. Bar Plot of Degrees
 # -----------------------------
@@ -273,7 +273,7 @@ AICctab(pl_model, exp_model, tpl_model, nobs = length(deg), weights = TRUE, delt
 
 # Plot with fitted models
 plot(deg_table$Degree, deg_table$CumulativeProbability, log = "xy", pch = 16,
-     xlab = "Degree", ylab = "P(K ≥ k)", main = "Cumulative Degree Distribution (log-log)")
+     xlab = "Degree", ylab = "P(K ≥ k)", main = "Cumulative Degree Distribution")
 
 curve(coef(pl_model)[1] * x^(-coef(pl_model)[2]), add = TRUE, col = "blue", lwd = 2)
 curve(coef(exp_model)[1] * exp(-coef(exp_model)[2] * x), add = TRUE, col = "red", lwd = 2)
