@@ -16,14 +16,9 @@ require(visNetwork)
 # -----------------------------
 cat("\n--- 1. Creating Directed Graph of Judo Attack Combinations ---\n")
 
-# -----------------------------
-# 1. Build the Graph (directed)
-# -----------------------------
-cat("\n--- 1. Creating Directed Graph of Judo Attack Combinations ---\n")
-
-# Define the attack combinations using igraph's formula notation
-# Using -+ for DIRECTED edges (from first to second technique)
-attack_combinations_igraph=graph.formula(
+# Define attack transitions between judo techniques
+# Each line indicates a valid transition in a combination (directed from left to right)
+attack_combinations_igraph =graph.formula(
   Seoi.nage-+Seoi.otoshi,
   Seoi.nage-+O.uchi.gari,
   Seoi.nage-+Ko.uchi.gari,
@@ -82,7 +77,29 @@ attack_combinations_igraph=graph.formula(
   Tsuri.komi.goshi-+Tsuri.komi.goshi,
   Hane.goshi-+O.uchi.gari,
   Sasae.tsurikomi.ashi-+Uchi.mata,
-  Sasae.tsurikomi.ashi-+Tai.otoshi
+  Sasae.tsurikomi.ashi-+Tai.otoshi,
+  De.ashi.harai-+Tai.otoshi,
+  De.ashi.harai-+Yoko.gake,
+  Hiza.guruma-+Ko.soto.gake,
+  Hiza.guruma-+Hane.goshi,
+  Ko.soto.gake-+Hane.goshi,
+  Ko.soto.gake-+Ko.uchi.gari,
+  Ko.uchi.gari-+Ko.uchi.makikomi,
+  Uki.goshi+-O.uchi.gari,
+  Uki.goshi-+Tsuri.goshi,
+  Tsuri.goshi-+O.uchi.gari,
+  Koshi.guruma-+Ashi.guruma,
+  Harai.goshi-+O.uchi.gari,
+  Hane.goshi-+Harai.goshi,
+  Hane.goshi-+Hane.makikomi,
+  Ushiro.goshi-+Tai.otoshi,
+  Ushiro.goshi-+Ura.nage,
+  Tsuri.komi.goshi-+Harai.goshi,
+  Tsuri.komi.goshi-+Ko.uchi.gari,
+  Uchi.mata-+Harai.goshi,
+  Tai.otoshi-+Seoi.otoshi,
+  Uki.otoshi-+O.uchi.gari,
+  Uki.otoshi-+Tomoe.nage
 )
 # Create a uniform node dataframe for use with visNetwork
 nodes <- data.frame(
