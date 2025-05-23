@@ -99,7 +99,8 @@ attack_combinations_igraph =graph.formula(
   Uchi.mata-+Harai.goshi,
   Tai.otoshi-+Seoi.otoshi,
   Uki.otoshi-+O.uchi.gari,
-  Uki.otoshi-+Tomoe.nage
+  Uki.otoshi-+Tomoe.nage,
+  Koshi.guruma-+Kani.bassami# note that this is an illegl movement
 )
 # Create a uniform node dataframe for use with visNetwork
 nodes <- data.frame(
@@ -200,7 +201,7 @@ par(mfrow = c(1, 2), mar = c(1, 1, 4, 1))
 plot1()
 plot2()
 
-legend("top", inset = -0.2, legend = c("Low Degree", "Medium", "High"),
+legend("bottom", inset = -0.2, legend = c("Low Degree", "Medium", "High"),
        pt.cex = c(6, 10, 14) / 5, pch = 21, pt.bg = "lightblue", col = "black",
        bty = "n", horiz = TRUE, title = "Node Size (Degree Scale)")
 
@@ -323,3 +324,4 @@ plot(ceb, attack_combinations_igraph, layout = layout_fr,
 legend("topright", legend = paste("Cluster", 1:length(ceb)),
        col = rainbow(length(ceb)), pch = 21, pt.bg = rainbow(length(ceb)),
        bty = "n", cex = 0.8)
+
