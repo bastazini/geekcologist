@@ -200,7 +200,7 @@ par(mfrow = c(1, 2), mar = c(1, 1, 4, 1))
 plot1()
 plot2()
 
-legend("bottom", inset = -0.2, legend = c("Low Degree", "Medium", "High"),
+legend("top", inset = -0.2, legend = c("Low Degree", "Medium", "High"),
        pt.cex = c(6, 10, 14) / 5, pch = 21, pt.bg = "lightblue", col = "black",
        bty = "n", horiz = TRUE, title = "Node Size (Degree Scale)")
 
