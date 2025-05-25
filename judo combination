@@ -10,6 +10,8 @@ require(bipartite)
 require(bbmle)
 require(influential)
 require(visNetwork)
+library(htmlwidgets)
+
 
 # -----------------------------
 # 1. Build the Graph (directed)
@@ -22,7 +24,6 @@ attack_combinations_igraph =graph.formula(
   Seoi.nage-+Seoi.otoshi,
   Seoi.nage-+O.uchi.gari,
   Seoi.nage-+Ko.uchi.gari,
-  Ippon.seoi.nage-+Ippon.seoi.nage,
   Ippon.seoi.nage-+Seoi.otoshi,
   Ippon.seoi.nage-+Ko.uchi.gari,
   Ippon.seoi.nage-+Osoto.gari,
@@ -44,13 +45,11 @@ attack_combinations_igraph =graph.formula(
   Ko.uchi.gari-+Ippon.seoi.nage,
   Ko.uchi.gari-+Hane.goshi,
   Osoto.gari-+Harai.goshi,
-  Osoto.gari-+Osoto.gari,
   Osoto.gari-+O.uchi.gari,
   Osoto.gari-+Ko.soto.gake,
   Osoto.gari-+Sasae.tsurikomi.ashi,
   Osoto.gari-+Okuri.ashi.harai,
   Osoto.gari-+Hiza.guruma,
-  Ko.soto.gari-+Ko.soto.gari,
   Ko.soto.gari-+Osoto.gari,
   Ko.soto.gari-+Tai.otoshi,
   Ko.soto.gari-+Harai.goshi,
@@ -58,13 +57,11 @@ attack_combinations_igraph =graph.formula(
   Hiza.guruma-+Sasae.tsurikomi.ashi,
   Hiza.guruma-+Osoto.gari,
   Hiza.guruma-+De.ashi.harai,
-  Hiza.guruma-+Hiza.guruma,
   Okuri.ashi.harai-+Sode.tsuri.komi.goshi,
   Okuri.ashi.harai-+Tai.otoshi,
   Okuri.ashi.harai-+Harai.goshi,
   Okuri.ashi.harai-+Ippon.seoi.nage,
   Okuri.ashi.harai-+Seoi.nage,
-  Tai.otoshi-+Tai.otoshi,
   Tai.otoshi-+Ko.uchi.gari,
   Tai.otoshi-+O.uchi.gari,
   Hikikomi.gaeshi-+O.uchi.gari,
@@ -74,7 +71,6 @@ attack_combinations_igraph =graph.formula(
   Hikikomi.gaeshi-+Sukui.nage,
   Tsuri.komi.goshi-+O.uchi.gari,
   Tsuri.komi.goshi-+Sode.tsuri.komi.goshi,
-  Tsuri.komi.goshi-+Tsuri.komi.goshi,
   Hane.goshi-+O.uchi.gari,
   Sasae.tsurikomi.ashi-+Uchi.mata,
   Sasae.tsurikomi.ashi-+Tai.otoshi,
@@ -102,6 +98,18 @@ attack_combinations_igraph =graph.formula(
   Uki.otoshi-+Tomoe.nage
   #Koshi.guruma-+Kani.bassami# since this is an illegl movement, I'm excluding it
 )
+# Manually add the self-loops, that is, moves that can follow themselves
+self_loops <- c(
+  "Osoto.gari", "Osoto.gari",
+  "Ippon.seoi.nage", "Ippon.seoi.nage",
+  "Ko.soto.gari", "Ko.soto.gari",
+  "Hiza.guruma", "Hiza.guruma",
+  "Tai.otoshi", "Tai.otoshi",
+  "Tsuri.komi.goshi", "Tsuri.komi.goshi"
+)
+attack_combinations_igraph <- add_edges(attack_combinations_igraph, self_loops)
+
+
 # Create a uniform node dataframe for use with visNetwork
 nodes <- data.frame(
   id = V(attack_combinations_igraph)$name,
@@ -120,7 +128,7 @@ edges <- igraph::as_data_frame(attack_combinations_igraph, what = "edges")
 cat("\n--- 2. Interactive Network Plot using visNetwork ---\n")
 
 # Build interactive graph with directional arrows and physics layout
-visNetwork(nodes, edges, main = "🥋 Judo Attack Combinations Network") %>%
+visNetwork(nodes, edges, main = "🥋 Judo Attack Combination Network") %>%
   visNodes(font = list(size = 18)) %>%
   visEdges(
     arrows = "to",  # Show arrowheads
@@ -135,7 +143,7 @@ visNetwork(nodes, edges, main = "🥋 Judo Attack Combinations Network") %>%
 
 # Save the interactive graph as a self-contained HTML
 saveWidget(
-  visNetwork(nodes, edges, main = "🥋 Judo Attack Combinations Network") %>%
+  visNetwork(nodes, edges, main = "🥋 Judo Attack Combination Network") %>%
     visNodes(font = list(size = 18)) %>%
     visEdges(arrows = "to", color = list(color = "black", highlight = "black", hover = "black")) %>%
     visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE) %>%
@@ -296,7 +304,7 @@ cent_network.vis(
   legend.title = "IVI",
   plot.title = "Attack Combination Network – IVI",
   layout = "kk",
-  dist.power = 1.5,
+  dist.power = .5,
   legend.position = "right",
   boxed.legend = TRUE,
   show.labels = TRUE
