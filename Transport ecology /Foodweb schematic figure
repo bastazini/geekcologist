@@ -1,13 +1,13 @@
-#Foodwebs used in the promotional figure of Transport Ecology
-# Install necessary packages (if not already installed)
-# install.packages(c("igraph", "ggplot2", "gridExtra"))
+###################################################################################################################################
+#Promotional figure for our piece in Transport Ecology: https://transportecology.info/research/roadkill-cascading-effects-food-webs
+###################################################################################################################################
 
 library(igraph)
 library(ggplot2)
 library(gridExtra)
 library(ggraph)
 
-# Function to create a bipartite food web
+# Create a bipartite food web
 create_food_web <- function(n_prey, n_predators, connectance) {
   # connectance is the proportion of all possible links that are present
   possible_edges <- n_prey * n_predators
@@ -29,7 +29,7 @@ create_food_web <- function(n_prey, n_predators, connectance) {
   return(graph)
 }
 
-# Function to create a simplified landscape representation as a ggplot
+# Create a simplified landscape representation as a ggplot
 create_landscape_plot <- function(road_density = 0, vertical_line = FALSE, horizontal_line = FALSE) {
   green_color <- "forestgreen"
   alpha_level <- 1 - road_density
